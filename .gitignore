@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+.DS_Store
+
+# Local runtime data — real user accounts, password hashes, and the live
+# SQLite database must never leave this machine.
+server/data/
