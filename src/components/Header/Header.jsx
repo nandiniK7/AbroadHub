@@ -30,24 +30,36 @@ function Header({ page, onCreate, onNotifications, onMessages, unreadCount=0, ti
   // sometimes right-side actions) all on one row — since the generic
   // page-title header would otherwise render as an unwanted extra row
   // above each page's own header.
-  if(page==='inbox' || page==='categories' || page.startsWith('nearby-category') || page.startsWith('provider-category') || page==='housing' || page==='housing-create' || page==='housing-edit' || page==='notifications' || page==='profile' || page==='editprofile')return null;
+  if(page==='inbox' || page==='categories' || page.startsWith('nearby-category') || page.startsWith('provider-category') || page==='housing' || page==='housing-create' || page==='housing-edit' || page==='notifications' || page==='profile' || page==='editprofile' || page==='search')return null;
 
   // Nearby keeps its Collections shortcut on the same header row as the
   // title, instead of a separate row below.
   if(page==='nearby'){
     return (
       <header className="header nearby-header">
-        <h1 className="header-title">Nearby</h1>
+        <div className="nearby-header-titles">
+          <h1 className="header-title">Nearby</h1>
+          <p className="nearby-header-subtitle">Find local services, businesses and community resources around you.</p>
+        </div>
 
-        <button
-          type="button"
-          className="nearby-header-collections"
-          onClick={onViewCollections}
-          aria-label="View saved collections"
-        >
-          <Grid2X2 size={16}/>
-          <span>{nearbySavedCount ?? '–'}</span>
-        </button>
+        <div className="nearby-header-actions">
+          <button
+            type="button"
+            className="nearby-header-collections"
+            onClick={onViewCollections}
+            aria-label="View saved collections"
+          >
+            <Grid2X2 size={16}/>
+            <span>{nearbySavedCount ?? '–'}</span>
+          </button>
+
+          <button type="button" onClick={onNotifications} aria-label="Notifications">
+            <Bell/>
+            {unreadCount>0&&
+              <span className="header-badge">{unreadCount}</span>
+            }
+          </button>
+        </div>
       </header>
     );
   }

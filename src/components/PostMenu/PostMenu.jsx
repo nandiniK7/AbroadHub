@@ -2,6 +2,7 @@ import { React, useEffect, useMemo, useRef, useState, Plus, Bell, MessageCircle,
 
 function PostMenu({
   close,
+  onEdit,
   onDelete
 }){
 
@@ -22,16 +23,20 @@ function PostMenu({
           Add to your story
         </button>
 
-        <button>
-          Edit Post
-        </button>
+        {onEdit&&
+          <button onClick={onEdit}>
+            Edit Post
+          </button>
+        }
 
-        <button
-          className="danger"
-          onClick={onDelete}
-        >
-          Delete
-        </button>
+        {onDelete&&
+          <button
+            className="danger"
+            onClick={onDelete}
+          >
+            Delete
+          </button>
+        }
 
       </div>
 

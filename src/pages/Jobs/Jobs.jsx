@@ -1,6 +1,7 @@
 import { React, useEffect, useMemo, useRef, useState, Plus, Bell, MessageCircle, MoreVertical, Heart, Search, BriefcaseBusiness, MapPin, UserCircle, Compass, HomeIcon, ChevronLeft, Edit3, Camera, ImageIcon, CalendarDays, Building2, X, Send, Bookmark, Share2, Users, Settings, LogOut, ChevronRight, Check, Trash2, Menu, Globe, Phone, Mail, Lock, Eye, EyeOff, Upload, SlidersHorizontal, ArrowLeft, UserPlus, MapPinned, LocateFixed, Sparkles, Sprout, ShoppingBag, ShoppingCart, HeartPulse, ShieldCheck, Scale, Flag, Utensils, Grid2X2, CORAL, festival, wordmark, splashLogo, categories, providers, seedJobs, seedPosts, seedNotifs, seedChats, load, save } from '../../shared/deps.js';
 import { api } from '../../api.js';
 import ShareSheet from '../../components/ShareSheet/ShareSheet.jsx';
+import Avatar from '../../components/Avatar/Avatar.jsx';
 
 const SECTIONS=[['All','All'],['Technical','Technical'],['Non Technical','Non-Technical']];
 const DATE_POSTED=[['Any Time','Any Time'],['Past 24 hours','last 24h'],['Past Week','Past Week'],['Past Month','Past Month']];
@@ -45,6 +46,15 @@ function Jobs({
   const [showLocationResults,setShowLocationResults]=useState(false);
   const [shareJob,setShareJob]=useState(null);
   const [detailJob,setDetailJob]=useState(null);
+  const [detailTab,setDetailTab]=useState('details');
+  const [posterProfile,setPosterProfile]=useState(null);
+
+  useEffect(()=>{
+    if(!detailJob?.postedByUsername){ setPosterProfile(null); return; }
+    let cancelled=false;
+    api.publicProfile(detailJob.postedByUsername).then(r=>{ if(!cancelled)setPosterProfile(r.user); }).catch(()=>{});
+    return ()=>{ cancelled=true; };
+  },[detailJob?.postedByUsername]);
 
   const [filterOpen,setFilterOpen]=useState(false);
   const [sectionFilter,setSectionFilter]=useState('All');
@@ -201,7 +211,8 @@ function Jobs({
       matchesWorkType && matchesEmployment && matchesDate && matchesExpMin && matchesExpMax;
   });
 
-  const openDetail=j=>setDetailJob(j);
+  const openDetail=j=>{ setDetailJob(j); setDetailTab('details'); };
+  const closeDetail=()=>{ setDetailJob(null); setDetailTab('details'); };
 
   return (
     <main className="inner-page jobs-page">
@@ -272,7 +283,7 @@ function Jobs({
           onClick={()=>setFilterOpen(true)}
           aria-label="Filter jobs"
         >
-          <SlidersHorizontal size={17}/>
+          <SlidersHorizontal size={21} strokeWidth={2.5}/>
           {activeFilterCount>0&&<span className="jobs-filter-count">{activeFilterCount}</span>}
         </button>
       </div>
@@ -281,9 +292,12 @@ function Jobs({
         {filtered.map(j=>(
           <article className="job-card" key={j.id} onClick={()=>openDetail(j)}>
             <div className="job-head">
-              <div>
-                <h2>{j.title}</h2>
-                <p>{j.company}</p>
+              <div className="job-head-main">
+                <div className="job-card-logo">{j.logo?<img src={j.logo} alt=""/>:<Building2 size={18}/>}</div>
+                <div>
+                  <h2>{j.title}</h2>
+                  <p>{j.company}</p>
+                </div>
               </div>
               <button
                 onClick={e=>toggleSaved(j.id,e)}
@@ -293,23 +307,26 @@ function Jobs({
               </button>
             </div>
 
-            <div className="badges">
-              <span>{j.work}</span>
-              <span>{j.salary}</span>
+            <div className="job-card-meta">
+              <span className="job-card-meta-pill">{j.work}</span>
+              <span className="job-card-meta-divider"/>
+              <span className="job-card-meta-item">{j.salary}</span>
+              <span className="job-card-meta-divider"/>
+              <span className="job-card-meta-item"><MapPin size={13}/>{j.location}</span>
             </div>
 
-            <p><MapPin size={15}/>{j.location}</p>
-            <p>{j.description}</p>
-            <small>Posted {j.posted}</small>
+            <p className="job-card-desc">{j.description}</p>
+
+            <div className="job-card-divider"/>
 
             <div className="job-actions" onClick={e=>e.stopPropagation()}>
               {callTarget(j) ? (
-                <a href={callTarget(j)}><Phone/>Call Now</a>
+                <a href={callTarget(j)}><Phone size={14}/>Call Now</a>
               ) : (
-                <button onClick={e=>callJob(j,e)}><Phone/>Call Now</button>
+                <button onClick={e=>callJob(j,e)}><Phone size={14}/>Call Now</button>
               )}
-              <button onClick={e=>messageJob(j,e)}><MessageCircle/>Message</button>
-              <button onClick={e=>{ e.stopPropagation(); setShareJob(j); }}><Share2/>Share</button>
+              <button onClick={e=>messageJob(j,e)}><MessageCircle size={14}/>Message</button>
+              <button className="job-share-btn" onClick={e=>{ e.stopPropagation(); setShareJob(j); }}><Share2 size={14}/>Share</button>
             </div>
           </article>
         ))}
@@ -389,12 +406,28 @@ function Jobs({
       }
 
       {detailJob&&
-        <div className="backdrop" onClick={()=>setDetailJob(null)}>
+        <div className="backdrop" onClick={closeDetail}>
           <div className="job-detail-sheet" onClick={e=>e.stopPropagation()}>
-            <button className="close" onClick={()=>setDetailJob(null)}><X/></button>
-            <div className="job-detail-logo">{detailJob.logo?<img src={detailJob.logo} alt=""/>:<Building2 size={28}/>}</div>
-            <h2>{detailJob.title}</h2>
-            <span className="job-detail-company">{detailJob.company}</span>
+            <div className="job-detail-top">
+              <button className="close" onClick={closeDetail} aria-label="Back"><ChevronLeft/></button>
+              <div className="job-detail-top-actions">
+                <button
+                  onClick={e=>toggleSaved(detailJob.id,e)}
+                  aria-label={saved.has(detailJob.id) ? 'Remove saved job' : 'Save job'}
+                >
+                  <Bookmark fill={saved.has(detailJob.id) ? "currentColor" : "none"}/>
+                </button>
+                <button onClick={e=>{ e.stopPropagation(); setShareJob(detailJob); }} aria-label="Share">
+                  <Share2/>
+                </button>
+              </div>
+            </div>
+
+            <div className="job-detail-identity">
+              <div className="job-detail-logo">{detailJob.logo?<img src={detailJob.logo} alt=""/>:<Building2 size={28}/>}</div>
+              <h2>{detailJob.title}</h2>
+              <span className="job-detail-company">{detailJob.company}</span>
+            </div>
 
             <div className="badges job-detail-badges">
               <span>{detailJob.work}</span>
@@ -402,26 +435,89 @@ function Jobs({
               {detailJob.type&&<span>{detailJob.type}</span>}
             </div>
 
-            <div className="job-detail-section">
-              <b>Job Description</b>
-              <p>{detailJob.description}</p>
+            <div className="job-detail-tabs">
+              <button className={detailTab==='details'?'active':''} onClick={()=>setDetailTab('details')}>Details</button>
+              <button className={detailTab==='about'?'active':''} onClick={()=>setDetailTab('about')}>About Job</button>
             </div>
 
-            {(detailJob.minExperience||detailJob.maxExperience)&&
-              <div className="job-detail-section">
-                <b>Experience</b>
-                <p>{detailJob.minExperience||'0'}–{detailJob.maxExperience||'–'} years</p>
-              </div>
+            {detailTab==='details'&&
+              <>
+                <div className="job-detail-section">
+                  <b>Job Description</b>
+                  <p>{detailJob.description}</p>
+                </div>
+
+                {(detailJob.minExperience||detailJob.maxExperience)&&
+                  <div className="job-detail-section">
+                    <b>Experience</b>
+                    <p>{detailJob.minExperience||'0'}–{detailJob.maxExperience||'–'} years</p>
+                  </div>
+                }
+
+                <div className="job-detail-section">
+                  <b>Pay</b>
+                  <p>{detailJob.salary}</p>
+                </div>
+
+                <div className="job-detail-section">
+                  <b>Location</b>
+                  <p><MapPin size={14}/>{detailJob.location}</p>
+                </div>
+              </>
             }
 
-            <div className="job-detail-section">
-              <b>Location</b>
-              <p><MapPin size={14}/>{detailJob.location}</p>
-            </div>
+            {detailTab==='about'&&
+              <>
+                <div className="job-detail-section">
+                  <b>Company</b>
+                  <p>{detailJob.company}</p>
+                </div>
+
+                <div className="job-detail-section">
+                  <b>Job Type</b>
+                  <p>{detailJob.type||'—'}</p>
+                </div>
+
+                <div className="job-detail-section">
+                  <b>Section</b>
+                  <p>{detailJob.section||'—'}</p>
+                </div>
+
+                {detailJob.languages&&
+                  <div className="job-detail-section">
+                    <b>Languages</b>
+                    <p>{detailJob.languages}</p>
+                  </div>
+                }
+
+                {detailJob.country&&
+                  <div className="job-detail-section">
+                    <b>Country</b>
+                    <p>{detailJob.country}</p>
+                  </div>
+                }
+
+                {detailJob.url&&
+                  <div className="job-detail-section">
+                    <b>Website</b>
+                    <p><a href={detailJob.url} target="_blank" rel="noreferrer">{detailJob.url}</a></p>
+                  </div>
+                }
+
+                <div className="job-detail-section">
+                  <b>Posted</b>
+                  <p>{detailJob.posted}</p>
+                </div>
+              </>
+            }
 
             {detailJob.postedByUsername&&
-              <div className="job-detail-posted-by">
-                Posted by <b>@{detailJob.postedByUsername}</b> · {detailJob.posted}
+              <div className="job-detail-poster-card">
+                <Avatar src={posterProfile?.avatar} text={posterProfile?.name||detailJob.postedByUsername}/>
+                <div>
+                  <b>{posterProfile?.name||detailJob.postedByUsername}</b>
+                  <span>@{detailJob.postedByUsername}</span>
+                </div>
               </div>
             }
 

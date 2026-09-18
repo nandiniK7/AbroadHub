@@ -3,6 +3,8 @@ import { React, useEffect, useMemo, useRef, useState, Plus, Bell, MessageCircle,
 import { api } from '../../api.js';
 import ShareSheet from '../../components/ShareSheet/ShareSheet.jsx';
 import CommentsSheet from '../../components/CommentsSheet/CommentsSheet.jsx';
+import PostMenu from '../../components/PostMenu/PostMenu.jsx';
+import EditPostSheet from '../../components/EditPostSheet/EditPostSheet.jsx';
 
 function Home({
   posts,
@@ -12,7 +14,6 @@ function Home({
   onLike,
   onStory,
   onViewStory,
-  onMenu,
   nav,
   requireAuth,
   toast,
@@ -22,6 +23,27 @@ function Home({
   const [savedPosts,setSavedPosts]=useState(()=>new Set());
   const [sharePost,setSharePost]=useState(null);
   const [commentsPost,setCommentsPost]=useState(null);
+  const [managePostId,setManagePostId]=useState(null);
+  const [confirmDeleteId,setConfirmDeleteId]=useState(null);
+  const [deleting,setDeleting]=useState(false);
+  const [editingPost,setEditingPost]=useState(null);
+
+  const managedPost=posts.find(p=>p.id===managePostId);
+
+  const confirmDelete=async()=>{
+    if(!confirmDeleteId)return;
+    setDeleting(true);
+    try{
+      await api.deletePost(confirmDeleteId);
+      setPosts?.(ps=>ps.filter(p=>p.id!==confirmDeleteId));
+      toast?.('Post deleted');
+    }catch(err){
+      toast?.(err.message||'Unable to delete post');
+    }finally{
+      setDeleting(false);
+      setConfirmDeleteId(null);
+    }
+  };
   const onCommentsCountChange=(postId,count)=>{
     setPosts?.(ps=>ps.map(p=>p.id===postId?{...p,commentsCount:count}:p));
   };
@@ -80,18 +102,7 @@ function Home({
           <div className="story-card my-story-card">
             <button className="story-open-button" onClick={()=>openGroup(myGroup)}>
               <div className={`story-ring ${myGroup.items.every(s=>s.viewedByMe)?'seen':''}`}>
-                {myGroup.items[myGroup.items.length-1].mediaType==='video' ? (
-                  <video
-                    src={myGroup.items[myGroup.items.length-1].media}
-                    muted
-                    playsInline
-                  />
-                ) : (
-                  <img
-                    src={myGroup.items[myGroup.items.length-1].media}
-                    alt=""
-                  />
-                )}
+                <Avatar src={user?.avatar || user?.profilePhoto} text={user?.name || 'You'}/>
               </div>
               <span>You</span>
             </button>
@@ -108,7 +119,7 @@ function Home({
           >
             <div className="story-ring">
               <div className="story-avatar">
-                <Camera size={23}/>
+                <Avatar src={user?.avatar || user?.profilePhoto} text={user?.name || 'You'}/>
               </div>
               <span className="story-plus">+</span>
             </div>
@@ -117,7 +128,6 @@ function Home({
         )}
 
         {otherGroups.map(g=>{
-          const last=g.items[g.items.length-1];
           const allSeen=g.items.every(s=>s.viewedByMe);
           return (
             <button
@@ -126,11 +136,7 @@ function Home({
               onClick={()=>openGroup(g)}
             >
               <div className={`story-ring ${allSeen?'seen':''}`}>
-                {last.mediaType==='video' ? (
-                  <video src={last.media} muted playsInline/>
-                ) : (
-                  <img src={last.media} alt=""/>
-                )}
+                <Avatar src={g.user?.avatar || g.user?.profilePhoto} text={g.user?.name||'User'}/>
               </div>
               <span>{g.user?.name||'User'}</span>
             </button>
@@ -168,7 +174,7 @@ function Home({
 
               <button
                 className="more"
-                onClick={onMenu}
+                onClick={()=>setManagePostId(p.id)}
               >
                 <MoreVertical/>
               </button>
@@ -258,6 +264,35 @@ function Home({
           toast={toast}
           close={()=>setCommentsPost(null)}
           onCountChange={onCommentsCountChange}
+        />
+      }
+
+      {managedPost&&
+        <PostMenu
+          close={()=>setManagePostId(null)}
+          onEdit={managedPost.isMine ? ()=>{ setEditingPost(managedPost); setManagePostId(null); } : undefined}
+          onDelete={managedPost.isMine ? ()=>{ setConfirmDeleteId(managedPost.id); setManagePostId(null); } : undefined}
+        />
+      }
+
+      {confirmDeleteId&&
+        <div className="backdrop" onClick={()=>setConfirmDeleteId(null)}>
+          <div className="confirm-sheet" onClick={e=>e.stopPropagation()}>
+            <h2 className="danger-text">Delete this post?</h2>
+            <p>This removes the post permanently. This can't be undone.</p>
+            <div className="confirm-sheet-actions">
+              <button className="outline" onClick={()=>setConfirmDeleteId(null)} disabled={deleting}>Cancel</button>
+              <button className="primary danger-button" onClick={confirmDelete} disabled={deleting}>{deleting?'Deleting…':'Delete'}</button>
+            </div>
+          </div>
+        </div>
+      }
+
+      {editingPost&&
+        <EditPostSheet
+          post={editingPost}
+          close={()=>setEditingPost(null)}
+          onSaved={updated=>setPosts?.(ps=>ps.map(p=>p.id===updated.id?updated:p))}
         />
       }
 

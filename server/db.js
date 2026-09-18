@@ -221,6 +221,7 @@ ensureColumn('users', 'business_fields', "TEXT DEFAULT '{}'");
 ensureColumn('users', 'business_hours', "TEXT DEFAULT ''");
 ensureColumn('users', 'phone', "TEXT DEFAULT ''");
 ensureColumn('users', 'phone_code', "TEXT DEFAULT ''");
+ensureColumn('users', 'date_of_birth', "TEXT DEFAULT ''");
 
 function seedIfEmpty() {
   const { count } = db.prepare('SELECT COUNT(*) as count FROM users').get();

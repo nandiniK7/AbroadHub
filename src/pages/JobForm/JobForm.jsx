@@ -1,11 +1,11 @@
-import { React, useEffect, useMemo, useRef, useState, Plus, Bell, MessageCircle, MoreVertical, Heart, Search, BriefcaseBusiness, MapPin, UserCircle, Compass, HomeIcon, ChevronLeft, Edit3, Camera, ImageIcon, CalendarDays, Building2, X, Send, Bookmark, Share2, Users, Settings, LogOut, ChevronRight, Check, Trash2, Menu, Globe, Phone, Mail, Lock, Eye, EyeOff, Upload, SlidersHorizontal, ArrowLeft, UserPlus, MapPinned, LocateFixed, Sparkles, Sprout, ShoppingBag, ShoppingCart, HeartPulse, ShieldCheck, Scale, Flag, Utensils, Grid2X2, CORAL, festival, wordmark, splashLogo, categories, providers, seedJobs, seedPosts, seedNotifs, seedChats, load, save } from '../../shared/deps.js';
+import { React, useEffect, useMemo, useRef, useState, Plus, Bell, MessageCircle, MoreVertical, Heart, Search, BriefcaseBusiness, MapPin, UserCircle, Compass, HomeIcon, ChevronLeft, Edit3, Camera, ImageIcon, CalendarDays, Building2, X, Send, Bookmark, Share2, Users, Settings, LogOut, ChevronRight, Check, Trash2, Menu, Globe, Phone, Mail, Lock, Eye, EyeOff, Upload, SlidersHorizontal, ArrowLeft, UserPlus, MapPinned, LocateFixed, Sparkles, Sprout, ShoppingBag, ShoppingCart, HeartPulse, ShieldCheck, Scale, Flag, Utensils, Grid2X2, CORAL, festival, wordmark, splashLogo, categories, providers, seedJobs, seedPosts, seedNotifs, seedChats, load, save, compressImageFile } from '../../shared/deps.js';
 
 // Module scope (not inside JobForm) — defining this inside the component
 // body was the root cause of every field losing focus after one keystroke:
 // React saw a brand-new "Field" function identity each render and
 // remounted the whole subtree instead of updating it in place.
 const Field=({label,children,full=true,error})=>(
-  <label className={full?'job-field':'job-field half'}>
+  <label className={`${full?'job-field':'job-field half'}${error?' has-error':''}`}>
     <span>{label}</span>
     {children}
     {error&&<small className="field-error">{error}</small>}
@@ -26,6 +26,19 @@ function JobForm({
   });
 
   const [logo,setLogo]=useState(null);
+  const [logoError,setLogoError]=useState('');
+  const logoInputRef=useRef(null);
+  const chooseLogo=e=>{
+    const file=e.target.files?.[0];
+    if(!file || !file.type.startsWith('image/'))return;
+    setLogoError('');
+    compressImageFile(file).then(setLogo).catch(()=>setLogoError('Unable to read that image. Please try a different file.'));
+  };
+  const removeLogo=()=>{
+    setLogo(null);
+    setLogoError('');
+    if(logoInputRef.current) logoInputRef.current.value='';
+  };
   const [errors,setErrors]=useState({});
   const [coords,setCoords]=useState({lat:null,lon:null});
   const [locationResults,setLocationResults]=useState([]);
@@ -270,26 +283,39 @@ function JobForm({
       </div>
 
       <div className="job-logo-upload">
-        <label className="job-logo-circle">
-          {logo
-            ? <img src={logo} alt="Company logo"/>
-            : <ImageIcon size={34}/>
-          }
+        <div className="job-logo-circle-wrap">
+          <button
+            type="button"
+            className="job-logo-circle"
+            onClick={()=>logoInputRef.current?.click()}
+            aria-label="Change company logo"
+          >
+            {logo
+              ? <img src={logo} alt="Company logo"/>
+              : <ImageIcon size={34}/>
+            }
+          </button>
+          <span className="job-logo-edit" onClick={()=>logoInputRef.current?.click()}>
+            <Edit3 size={14}/>
+          </span>
           <input
+            ref={logoInputRef}
             type="file"
             accept="image/*"
             hidden
-            onChange={e=>{
-              const file=e.target.files?.[0];
-              if(!file)return;
-              const reader=new FileReader();
-              reader.onload=()=>setLogo(reader.result);
-              reader.readAsDataURL(file);
-            }}
+            onChange={chooseLogo}
           />
-        </label>
+        </div>
         <span>Company Logo</span>
         <small>(Optional)</small>
+        {logo&&
+          <button type="button" className="job-logo-remove" onClick={removeLogo}>
+            Remove logo
+          </button>
+        }
+        {logoError&&
+          <div className="error job-logo-error">{logoError}</div>
+        }
       </div>
 
       <Field label="Job Title" error={errors['Job Title']}>

@@ -49,7 +49,30 @@ import {
   Scale,
   Flag,
   Utensils,
-  Grid2X2
+  Grid2X2,
+  User,
+  AtSign,
+  FileText,
+  ChevronDown,
+  ArrowRight,
+  Wrench,
+  Zap,
+  Scissors,
+  Dumbbell,
+  GraduationCap,
+  Music,
+  Video,
+  Palette,
+  PawPrint,
+  Car,
+  Hammer,
+  Stethoscope,
+  Cake,
+  Shirt,
+  Wallet,
+  Moon,
+  Wand2,
+  Martini
 } from 'lucide-react';
 
 
@@ -306,6 +329,33 @@ export const save =(k,v)=>{
   }
 };
 
+// Re-encodes an image file to a bounded JPEG data URL before it's sent to
+// the backend as JSON — an unmodified phone photo (often several MB) can
+// exceed the server's request body limit, the same reason ImageCropModal
+// already bounds avatar photos via canvas. Aspect ratio is preserved (no
+// crop) since feed posts render images at their natural ratio.
+export function compressImageFile(file, { maxDimension=1600, quality=0.82 }={}){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onerror=()=>reject(reader.error||new Error('Could not read file'));
+    reader.onload=()=>{
+      const img=new Image();
+      img.onerror=()=>reject(new Error('Could not read image'));
+      img.onload=()=>{
+        const scale=Math.min(1,maxDimension/Math.max(img.naturalWidth,img.naturalHeight));
+        const w=Math.round(img.naturalWidth*scale);
+        const h=Math.round(img.naturalHeight*scale);
+        const canvas=document.createElement('canvas');
+        canvas.width=w; canvas.height=h;
+        canvas.getContext('2d').drawImage(img,0,0,w,h);
+        resolve(canvas.toDataURL('image/jpeg',quality));
+      };
+      img.src=reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 // Compact relative time for a notification row, e.g. "4h", "2d", "3w".
 export function timeAgoShort(iso){
   const diff=Date.now()-new Date(iso).getTime();
@@ -334,4 +384,4 @@ export function notifDateGroup(iso){
 
 
 
-export { React, useEffect, useMemo, useRef, useState, Plus, Bell, MessageCircle, MoreVertical, Heart, Search, BriefcaseBusiness, MapPin, UserCircle, Compass, HomeIcon, ChevronLeft, Edit3, Camera, ImageIcon, CalendarDays, Building2, X, Send, Bookmark, Share2, Users, Settings, LogOut, ChevronRight, Check, Trash2, Menu, Globe, Phone, Mail, Lock, Eye, EyeOff, Upload, SlidersHorizontal, ArrowLeft, UserPlus, MapPinned, LocateFixed, Sparkles, Sprout, ShoppingBag, ShoppingCart, HeartPulse, ShieldCheck, Scale, Flag, Utensils, Grid2X2 };
+export { React, useEffect, useMemo, useRef, useState, Plus, Bell, MessageCircle, MoreVertical, Heart, Search, BriefcaseBusiness, MapPin, UserCircle, Compass, HomeIcon, ChevronLeft, Edit3, Camera, ImageIcon, CalendarDays, Building2, X, Send, Bookmark, Share2, Users, Settings, LogOut, ChevronRight, Check, Trash2, Menu, Globe, Phone, Mail, Lock, Eye, EyeOff, Upload, SlidersHorizontal, ArrowLeft, UserPlus, MapPinned, LocateFixed, Sparkles, Sprout, ShoppingBag, ShoppingCart, HeartPulse, ShieldCheck, Scale, Flag, Utensils, Grid2X2, User, AtSign, FileText, ChevronDown, ArrowRight, Wrench, Zap, Scissors, Dumbbell, GraduationCap, Music, Video, Palette, PawPrint, Car, Hammer, Stethoscope, Cake, Shirt, Wallet, Moon, Wand2, Martini };

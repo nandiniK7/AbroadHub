@@ -8,8 +8,10 @@ const PORT = Number(process.env.PORT || 8787);
 const ROOT = path.resolve(__dirname, '..');
 const DIST = path.join(ROOT, 'dist');
 const SECRET = process.env.JWT_SECRET || 'abroadhub-launch-secret-change-me';
+const MAX_BODY_BYTES = 10 * 1024 * 1024;
 const ACCOUNT_TYPES = ['personal', 'business'];
 const CATEGORY_TYPES = ['business', 'provider'];
+const GENDER_OPTIONS = ['Male', 'Female', 'Prefer not to say'];
 
 // Backend password policy — the frontend gives live feedback for the same
 // rules, but that's advisory only; this is the real gate. Never trust a
@@ -30,9 +32,27 @@ function send(res, status, body, headers = {}) {
 function parseBody(req) {
   return new Promise((resolve, reject) => {
     let raw = '';
-    req.on('data', c => { raw += c; if (raw.length > 5e6) req.destroy(); });
-    req.on('end', () => { try { resolve(raw ? JSON.parse(raw) : {}); } catch { reject(new Error('Invalid JSON')); } });
-    req.on('error', reject);
+    let tooLarge = false;
+    req.on('data', c => {
+      if (tooLarge) return;
+      raw += c;
+      // Used to call req.destroy() here, which tears down the socket
+      // `res` also writes to — the client saw a bare network error instead
+      // of a real response. Just stop buffering and let the route's normal
+      // error handling send real JSON once the stream finishes.
+      if (raw.length > MAX_BODY_BYTES) {
+        tooLarge = true;
+        raw = '';
+        const err = new Error('That upload is too large. Please choose a smaller photo or video.');
+        err.status = 413;
+        reject(err);
+      }
+    });
+    req.on('end', () => {
+      if (tooLarge) return;
+      try { resolve(raw ? JSON.parse(raw) : {}); } catch { reject(new Error('Invalid JSON')); }
+    });
+    req.on('error', err => { if (!tooLarge) reject(err); });
   });
 }
 function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) {
@@ -90,7 +110,7 @@ function serializeSelf(user) {
     id: user.id, name: user.name, username: user.username, email: user.email,
     bio: user.bio || '', languages: user.languages || '',
     occupation: user.occupation || '', location: user.location || '',
-    gender: user.gender || '',
+    gender: user.gender || '', dateOfBirth: user.date_of_birth || '',
     lat: user.lat ?? null, lon: user.lon ?? null,
     avatar: user.avatar || '', profilePhoto: user.avatar || '',
     followers: followerCount(user.id), following: followingCount(user.id),
@@ -241,6 +261,17 @@ const server = http.createServer(async (req, res) => {
   try {
     if (route === 'health' && req.method === 'GET') return send(res, 200, { ok: true, service: 'AbroadHub API' }, cors);
 
+    // Read-only pre-signup check so onboarding can tell the user a username
+    // is taken before they submit — registration itself still falls back to
+    // an auto-suffixed username on a collision rather than failing, so this
+    // is purely advisory and never blocks account creation.
+    if (route === 'auth/username-available' && req.method === 'GET') {
+      const u = String(url.searchParams.get('u') || '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 24);
+      if (!u) return send(res, 200, { available: false }, cors);
+      const taken = !!db.prepare('SELECT 1 FROM users WHERE username = ?').get(u);
+      return send(res, 200, { available: !taken }, cors);
+    }
+
     // ---- AUTH ----
     if (route === 'auth/register' && req.method === 'POST') {
       const b = await parseBody(req);
@@ -272,6 +303,12 @@ const server = http.createServer(async (req, res) => {
       const location = String(b.location || '').trim().slice(0, 200);
       const lat = typeof b.lat === 'number' ? b.lat : null;
       const lon = typeof b.lon === 'number' ? b.lon : null;
+      // Optional profile-setup fields carried in from the Service Provider
+      // onboarding screen — a bare name/email/password signup still works
+      // unmodified since every one of these defaults to empty/none.
+      const gender = GENDER_OPTIONS.includes(b.gender) ? b.gender : '';
+      const dateOfBirth = String(b.dateOfBirth || '').trim().slice(0, 20);
+      const avatar = typeof b.avatar === 'string' ? b.avatar.slice(0, 5_000_000) : '';
       let occupation = ''; let businessCategory = '';
       if (accountType === 'business') {
         if (categoryType === 'provider') occupation = category; else businessCategory = category;
@@ -282,18 +319,25 @@ const server = http.createServer(async (req, res) => {
       }
 
       const usernameBase = (name || email.split('@')[0]).toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 24) || 'user';
-      let username = usernameBase, n = 1;
+      // A client-chosen username (from the profile-setup screen) is used
+      // when it's valid and free; otherwise this falls back to the same
+      // auto-generated username a bare signup has always gotten.
+      const requestedUsername = String(b.username || '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 24);
+      let username = requestedUsername && !db.prepare('SELECT 1 FROM users WHERE username = ?').get(requestedUsername)
+        ? requestedUsername
+        : usernameBase;
+      let n = 1;
       while (db.prepare('SELECT 1 FROM users WHERE username = ?').get(username)) username = `${usernameBase}${n++}`;
       const id = uid();
       const now = new Date().toISOString();
       db.prepare(`INSERT INTO users
         (id,name,username,email,password_hash,bio,languages,avatar,demo,created_at,
          account_type,country,occupation,business_category,business_name,business_fields,business_hours,
-         phone,phone_code,location,lat,lon)
-        VALUES (?,?,?,?,?,?,?,?,0,?, ?,?,?,?,?,?,?, ?,?,?,?,?)`)
-        .run(id, name, username, email, hashPassword(password), bio, languages, '', now,
+         phone,phone_code,location,lat,lon,gender,date_of_birth)
+        VALUES (?,?,?,?,?,?,?,?,0,?, ?,?,?,?,?,?,?, ?,?,?,?,?,?,?)`)
+        .run(id, name, username, email, hashPassword(password), bio, languages, avatar, now,
           accountType, country, occupation, businessCategory, businessName, businessFieldsJson, businessHours,
-          phone, phoneCode, location, lat, lon);
+          phone, phoneCode, location, lat, lon, gender, dateOfBirth);
       const user = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
       return send(res, 201, { user: serializeSelf(user), message: 'Account created. Please log in.' }, cors);
     }
@@ -388,6 +432,18 @@ const server = http.createServer(async (req, res) => {
       if (already) db.prepare('DELETE FROM post_likes WHERE post_id = ? AND user_id = ?').run(postId, user.id);
       else db.prepare('INSERT INTO post_likes (post_id, user_id, created_at) VALUES (?,?,?)').run(postId, user.id, new Date().toISOString());
       return send(res, 200, { post: serializePost(post, user.id) }, cors);
+    }
+    if (pathParts[1] === 'posts' && pathParts.length === 3 && req.method === 'PUT') {
+      const user = authUser(req); if (!user) return send(res, 401, { error: 'Authentication required.' }, cors);
+      const post = db.prepare('SELECT * FROM posts WHERE id = ?').get(pathParts[2]);
+      if (!post) return send(res, 404, { error: 'Post not found.' }, cors);
+      if (post.user_id !== user.id) return send(res, 403, { error: 'You can only edit your own posts.' }, cors);
+      const b = await parseBody(req);
+      const text = String(b.text || '').trim();
+      if (!text && !post.image && !post.video) return send(res, 400, { error: 'A post needs text or media.' }, cors);
+      db.prepare('UPDATE posts SET text = ? WHERE id = ?').run(text, post.id);
+      const updated = db.prepare('SELECT * FROM posts WHERE id = ?').get(post.id);
+      return send(res, 200, { post: serializePost(updated, user.id) }, cors);
     }
     if (pathParts[1] === 'posts' && pathParts.length === 3 && req.method === 'DELETE') {
       const user = authUser(req); if (!user) return send(res, 401, { error: 'Authentication required.' }, cors);
@@ -835,7 +891,11 @@ const server = http.createServer(async (req, res) => {
     }
 
     return send(res, 404, { error: 'API route not found.' }, cors);
-  } catch (e) { console.error(e); return send(res, 500, { error: 'Server error. Please try again.' }, cors); }
+  } catch (e) {
+    console.error(e);
+    if (e.status) return send(res, e.status, { error: e.message }, cors);
+    return send(res, 500, { error: 'Server error. Please try again.' }, cors);
+  }
 });
 
 server.listen(PORT, () => console.log(`AbroadHub server running on http://localhost:${PORT}`));

@@ -37,6 +37,25 @@ function SearchPage({
 
   const providerList=seedPeople;
 
+  // Follow state starts unknown for every row — without this, a person you
+  // already follow would show "Follow" until clicked, and clicking it would
+  // silently unfollow them instead of reflecting reality. Hydrate the real
+  // isFollowing status (already returned by /users/:username) for whichever
+  // list is on screen, once per set of usernames.
+  useEffect(()=>{
+    if(tab!=='Accounts' && tab!=='Provider')return;
+    const list=tab==='Accounts'?accountList:providerList;
+    const unknown=list.filter(a=>!(a.u in followState));
+    if(!unknown.length)return;
+    let cancelled=false;
+    Promise.all(unknown.map(a=>api.publicProfile(a.u).then(r=>[a.u,!!r.user?.isFollowing]).catch(()=>[a.u,false])))
+      .then(entries=>{
+        if(cancelled)return;
+        setFollowState(x=>({...x,...Object.fromEntries(entries)}));
+      });
+    return ()=>{ cancelled=true; };
+  },[tab,accountList,providerList]);
+
   const toggleFollow=async(username)=>{
     if(!requireAuth())return;
     try{
@@ -63,7 +82,10 @@ function SearchPage({
             </div>
           </button>
 
-          <button onClick={()=>toggleFollow(a.u)}>
+          <button
+            className={`search-follow-btn${followState[a.u]?' following':''}`}
+            onClick={()=>toggleFollow(a.u)}
+          >
             {followState[a.u]?'Following':'Follow'}
           </button>
         </div>
@@ -81,13 +103,17 @@ function SearchPage({
     : [];
 
   return (
-    <main className="inner-page">
-
-      <div className="search-head">
-
+    <>
+      <header className="header search-header">
         <button onClick={onBack} aria-label="Back">
           <ArrowLeft/>
         </button>
+        <h1 className="header-title">Search</h1>
+      </header>
+
+      <main className="inner-page">
+
+      <div className="search-head">
 
         <div className="search-input">
 
@@ -171,7 +197,8 @@ function SearchPage({
         </div>
       }
 
-    </main>
+      </main>
+    </>
   );
 }
 

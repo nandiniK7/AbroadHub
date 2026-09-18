@@ -28,7 +28,7 @@ const REQUIREMENTS = [
 
 export default function Auth({ mode = 'login', extra = null, onBack, onSuccess, onRequestSignup }) {
   const [view, setView] = useState(mode);
-  const [name, setName] = useState('');
+  const [name, setName] = useState(extra?.name || '');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -81,7 +81,7 @@ export default function Auth({ mode = 'login', extra = null, onBack, onSuccess, 
     setBusy(true);
     try {
       if (view === 'signup') {
-        await api.register({ name, email, password, ...(extra || {}) });
+        await api.register({ ...(extra || {}), name, email, password });
         setNotice('Account created successfully. Please log in.');
         setView('login'); setPassword(''); setConfirmPassword(''); setPasswordTouched(false);
       } else if (view === 'login') {
@@ -126,12 +126,12 @@ export default function Auth({ mode = 'login', extra = null, onBack, onSuccess, 
           }
           {view !== 'reset' &&
             <label>Email
-              <input ref={emailRef} type="email" value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={focusNext(passwordRef)} placeholder="you@example.com" autoComplete="email" required />
+              <input ref={emailRef} type="email" value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={focusNext(passwordRef)} placeholder="you@example.com" autoComplete={view === 'login' ? 'username' : 'email'} required />
             </label>
           }
           {view === 'reset' &&
             <label>Reset token
-              <input ref={tokenRef} value={token} onChange={e=>setToken(e.target.value)} onKeyDown={focusNext(passwordRef)} placeholder="Paste reset token" required />
+              <input ref={tokenRef} value={token} onChange={e=>setToken(e.target.value)} onKeyDown={focusNext(passwordRef)} placeholder="Paste reset token" autoComplete="one-time-code" required />
             </label>
           }
           {view !== 'forgot' &&

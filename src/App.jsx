@@ -10,7 +10,6 @@ import CreateSheet from './components/CreateSheet/CreateSheet.jsx';
 import PostComposer from './components/PostComposer/PostComposer.jsx';
 import StoryComposer from './components/StoryComposer/StoryComposer.jsx';
 import StoryViewer from './components/StoryViewer/StoryViewer.jsx';
-import PostMenu from './components/PostMenu/PostMenu.jsx';
 import Home from './pages/Home/Home.jsx';
 import Explore from './pages/Explore/Explore.jsx';
 import SearchPage from './pages/SearchPage/SearchPage.jsx';
@@ -424,7 +423,6 @@ function App(){
               onLike={likePost}
               onStory={()=>setSheet('story')}
               onViewStory={(group,startIndex)=>setViewingStory({group,startIndex})}
-              onMenu={()=>setSheet('postmenu')}
               nav={nav}
               requireAuth={requireAuth}
               toast={toastIt}
@@ -741,16 +739,6 @@ function App(){
               createPost={async payload=>{
                 const result=await api.createPost(payload);
                 setPosts(current=>[result.post,...current]);
-              }}
-            />
-          }
-
-          {sheet==='postmenu'&&
-            <PostMenu
-              close={()=>setSheet(null)}
-              onDelete={()=>{
-                setPosts(p=>p.slice(1));
-                setSheet(null);
               }}
             />
           }

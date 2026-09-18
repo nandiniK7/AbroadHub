@@ -4,7 +4,12 @@ async function request(path, options = {}) {
   const token = localStorage.getItem('ah_token');
   const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
   if (token) headers.Authorization = `Bearer ${token}`;
-  const response = await fetch(`${API_BASE}/api${path}`, { ...options, headers });
+  let response;
+  try{
+    response = await fetch(`${API_BASE}/api${path}`, { ...options, headers });
+  }catch{
+    throw new Error('Could not reach the server. Check your connection and try again.');
+  }
   let data = null;
   try { data = await response.json(); } catch { data = {}; }
   if (!response.ok) {
@@ -27,12 +32,14 @@ async function request(path, options = {}) {
 export const api = {
   health: () => request('/health'),
   register: (payload) => request('/auth/register', { method: 'POST', body: JSON.stringify(payload) }),
+  usernameAvailable: (username) => request(`/auth/username-available?u=${encodeURIComponent(username)}`),
   login: (payload) => request('/auth/login', { method: 'POST', body: JSON.stringify(payload) }),
   forgotPassword: (email) => request('/auth/forgot-password', { method: 'POST', body: JSON.stringify({ email }) }),
   resetPassword: (payload) => request('/auth/reset-password', { method: 'POST', body: JSON.stringify(payload) }),
   me: () => request('/me'),
   posts: () => request('/posts'),
   createPost: (payload) => request('/posts', { method: 'POST', body: JSON.stringify(payload) }),
+  updatePost: (id, payload) => request(`/posts/${encodeURIComponent(id)}`, { method: 'PUT', body: JSON.stringify(payload) }),
   toggleLike: (id) => request(`/posts/${id}/like`, { method: 'POST' }),
   deletePost: (id) => request(`/posts/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   comments: (postId) => request(`/posts/${encodeURIComponent(postId)}/comments`),

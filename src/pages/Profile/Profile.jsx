@@ -2,6 +2,7 @@ import Avatar from '../../components/Avatar/Avatar.jsx';
 import ShareSheet from '../../components/ShareSheet/ShareSheet.jsx';
 import PostMenu from '../../components/PostMenu/PostMenu.jsx';
 import CommentsSheet from '../../components/CommentsSheet/CommentsSheet.jsx';
+import EditPostSheet from '../../components/EditPostSheet/EditPostSheet.jsx';
 import { api } from '../../api.js';
 import { React, useState, Plus, Bookmark, Menu, Share2, MoreVertical, Heart, MessageCircle, Globe } from '../../shared/deps.js';
 
@@ -26,6 +27,7 @@ function Profile({
   const [confirmDeleteId,setConfirmDeleteId]=useState(null);
   const [deleting,setDeleting]=useState(false);
   const [commentsPost,setCommentsPost]=useState(null);
+  const [editingPost,setEditingPost]=useState(null);
 
   const likePost=id=>{
     if(!requireAuth?.())return;
@@ -208,6 +210,7 @@ function Profile({
       {managePostId&&
         <PostMenu
           close={()=>setManagePostId(null)}
+          onEdit={()=>{ setEditingPost(ownPosts.find(p=>p.id===managePostId)||null); setManagePostId(null); }}
           onDelete={()=>{ setConfirmDeleteId(managePostId); setManagePostId(null); }}
         />
       }
@@ -223,6 +226,14 @@ function Profile({
             </div>
           </div>
         </div>
+      }
+
+      {editingPost&&
+        <EditPostSheet
+          post={editingPost}
+          close={()=>setEditingPost(null)}
+          onSaved={updated=>setPosts?.(ps=>ps.map(p=>p.id===updated.id?updated:p))}
+        />
       }
     </>
   );
